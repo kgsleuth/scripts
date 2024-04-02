@@ -33,19 +33,8 @@ sudo apt-get update
 # Install Microsoft Defender for Endpoint
 sudo apt-get install -y mdatp
 
-# Configuration step: Prompt for tenant ID
-read -p "Enter your Tenant ID: " TENANT_ID
-if [[ ! -z "$TENANT_ID" ]]; then
-    sudo mdatp config set --tenant-id $TENANT_ID
-    log "Tenant ID set successfully."
-else
-    log "No Tenant ID provided, skipping configuration."
-fi
-
 # Start the daemon
 sudo systemctl start mdatp
-
-# Enable the service to start at boot
 sudo systemctl enable mdatp
 
 log "Microsoft Defender for Endpoint installation and setup complete."
