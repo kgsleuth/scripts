@@ -823,4 +823,4 @@ main() {
 
 
 # This is the entry point of the script, and checks if both azure_workspace and secret_key variables are provided
-[[ -n "$azure_workspace" && -n "$secret_key" ]] && main $1 $2
+main $1 $2
