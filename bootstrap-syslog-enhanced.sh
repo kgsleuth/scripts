@@ -92,8 +92,8 @@ RSYSLOG_CONF=$(cat <<EOF
 # syslog handling, improving management, security, and log organization.
 
 ## Load modules for UDP/TCP syslog. Ensures no duplicate module loading.
-# module(load="imudp") # For UDP
-# module(load="imtcp") # For TCP & TLS
+module(load="imudp") # For UDP
+module(load="imtcp") # For TCP & TLS
 
 ## Define UDP input on port 514 for syslog messages.
 input(type="imudp" port="514" address="0.0.0.0" ruleset="remoteLogs")
@@ -821,27 +821,6 @@ main() {
     log --info "Script execution completed."
 }
 
-# Initiates the script execution by calling the main function.
-# Parse command line options
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -w|--workspace-id)
-            shift
-            azure_workspace="$1"
-            ;;
-        -s|--secret-key)
-            shift
-            secret_key="$1"
-            ;;
-        *)
-            echo "Unknown option: $1"
-            usage
-            exit 1
-            ;;
-    esac
-    shift
-done
-
 
 # This is the entry point of the script, and checks if both azure_workspace and secret_key variables are provided
-[[ -n "$azure_workspace" && -n "$secret_key" ]] && main "$azure_workspace" "$secret_key" 
+[[ -n "$azure_workspace" && -n "$secret_key" ]] && main $1 $2
