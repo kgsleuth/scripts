@@ -780,11 +780,10 @@ main() {
     log --info "Freeing up space and removing outdated packages by clearing the package manager cache"
     upm --clean
 
+    setenforce 0
+
     log --info "Generating a self-signed certificate for TLS if none is provided, ensuring secure communication for syslog over TLS"
     generate_tls_certificates
-
-    log --info "Configuring security profiles for SELinux."
-    configure_selinux --bootstrap
 
     [ ! -f "/.dockerenv" ] && log --info "Installing the Azure Monitor Agent" || log --info "Skipping OMS Install, in staging environment"
     [ ! -f "/.dockerenv" ] && install_oms_agent $azure_workspace $secret_key
@@ -793,10 +792,6 @@ main() {
     config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
     config_builder "$RSYSLOG_CONF_PATH"         "$RSYSLOG_CONF"     "Normal log reception"
     config_builder "$RSYSLOG_TLS_CONF_PATH"     "$RSYSLOG_TLS_CONF" "Secure log reception"
-
-
-    log --info "Configuring security profiles for SELinux."
-    configure_selinux --bootstrap
 
     log --info "Enabling and starting firewall service"
     configure_firewall  --enable
@@ -820,30 +815,33 @@ main() {
     log --info "Creating a CRON job to delete logs older than 3 days."
     set_cron_to_delete_old_logs
 
+    log --info "Configuring security profiles for SELinux."
+    configure_selinux --bootstrap
+    
     log --info "Script execution completed."
 }
 
 # Initiates the script execution by calling the main function.
-
 # Parse command line options
-while getopts ":w:s:" opt; do
-    case $opt in
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
         -w|--workspace-id)
-            azure_workspace="$OPTARG"
+            shift
+            azure_workspace="$1"
             ;;
         -s|--secret-key)
-            secret_key="$OPTARG"
+            shift
+            secret_key="$1"
             ;;
-        \?)
-            echo "Invalid option: -$OPTARG" >&2
+        *)
+            echo "Unknown option: $1"
             usage
-            ;;
-        :)
-            echo "Option -$OPTARG requires an argument." >&2
-            usage
+            exit 1
             ;;
     esac
+    shift
 done
+
 
 # This is the entry point of the script, and checks if both azure_workspace and secret_key variables are provided
 [[ -n "$azure_workspace" && -n "$secret_key" ]] && main "$azure_workspace" "$secret_key" 
