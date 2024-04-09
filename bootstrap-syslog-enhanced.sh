@@ -92,8 +92,8 @@ RSYSLOG_CONF=$(cat <<EOF
 # syslog handling, improving management, security, and log organization.
 
 ## Load modules for UDP/TCP syslog. Ensures no duplicate module loading.
-module(load="imudp") # For UDP
-module(load="imtcp") # For TCP & TLS
+# module(load="imudp") # For UDP
+# module(load="imtcp") # For TCP & TLS
 
 ## Define UDP input on port 514 for syslog messages.
 input(type="imudp" port="514" address="0.0.0.0" ruleset="remoteLogs")
