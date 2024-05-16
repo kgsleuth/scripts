@@ -15,355 +15,43 @@
 #
 # Version: 1.0
 
+## Imports
+# Download common.sh
+download_file() {
+  # This function takes two arguments: the URL to download and the output file path.
+  # It will attempt to download the file up to 5 times, waiting 5 seconds between
+  # each attempt. If the download fails after 5 attempts, the function returns 1.
 
-log() {
-    # Log messages with different severity levels and colors
-    # Parameters:
-    #   $1 - Severity level (info, warn, error, debug, trace)
-    #   $2 - Message to log
-    # Logs messages to the terminal with color formatting
-    
-    local level=""
-    local message=""
-    local color_level=""
-    local color_message=""
-    local color_time=""
-    local syslog_severity=""
+    local url=$1
+    local output=$2
+    local retries=5
+    local wait=5
 
-    local pid=$$
-
-    case $1 in
-        -i|--info)
-            level="[INFO]"
-            message="${@:2}"
-            color_level="\033[0;32m"
-            color_message="\033[0;94m"
-            color_time="\033[0;33m"
-            syslog_severity="info"
-            ;;
-        -w|--warn)
-            level="[WARN]"
-            message="${@:2}"
-            color_level="\033[0;33m"
-            color_message="\033[0;96m"
-            color_time="\033[0;33m"
-            syslog_severity="warning"
-            ;;
-        -e|--error)
-            level="[ERROR]"
-            message="${@:2}"
-            color_level="\033[0;31m"
-            color_message="\033[0;96m"
-            color_time="\033[0;33m"
-            syslog_severity="err"
-            ;;
-        -d|--debug)
-            level="[DEBUG]"
-            message="${@:2}"
-            color_level="\033[0;36m"
-            color_message="\033[0;96m"
-            color_time="\033[0;33m"
-            syslog_severity="debug"
-            ;;
-        -t|--trace)
-            level="[TRACE]"
-            message="${@:2}"
-            color_level="\033[0;37m"
-            color_message="\033[0;96m"
-            color_time="\033[0;33m"
-            syslog_severity="debug"
-            ;;
-        *)
-            level="[UNKNOWN]"
-            message="$@"
-            color_level="\033[0m"
-            color_message="\033[0;96m"
-            color_time="\033[0;33m"
-            syslog_severity="notice"
-            ;;
-    esac
-
-    # Log to both the terminal and the specified log file with color formatting
-    echo -e "$color_time$(date +'%Y-%m-%d %H:%M:%S') $color_level$level\033[0m - $color_message$message\033[0m"
-
-    # Additionally, log to syslog with the specified severity level, including the level text
-    logger -p "user.$syslog_severity" -t "$0" [$$] "$level $message"
-}
-
-
-upm() {
-    # Manage package updates, clean-ups, and installations on Linux systems
-    # Detects the system's package manager and performs specified actions
-    # based on the options provided (update, clean, install, remove)
-
-    usage() {
-        echo "Usage: upm [options]"
-        echo "This script must be run as root to manage packages on Linux systems."
-        echo ""
-        echo "Options:"
-        echo "  -u, --update                    Updates the system's package lists and installs available updates."
-        echo "  -c, --clean                     Cleans up the package manager's cache and removes orphaned dependencies."
-        echo "  -p, --packages <package_names>  Installs specified packages. Multiple packages can be specified separated by spaces."
-        echo "  -r, --remove   <package_names>  Removes specified packages. Multiple packages can be specified separated by spaces."
-        echo "  -h, --help                      Displays this help information and exits."
-        echo ""
-        echo "Examples:"
-        echo "  upm --update                    Update the system's package list and install updates."
-        echo "  upm --clean                     Clean up unnecessary packages and cache."
-        echo "  upm --packages nano vim         Install 'nano' and 'vim' packages."
-    }
-
-
-    detect_pkg_manager() {
-        # Detect the available package manager on the system
-        # Returns the package manager command if found, otherwise logs a warning
-        
-        local pkg_manager=""
-
-        if command -v apt > /dev/null 2>&1; then
-            pkg_manager="apt"
-        elif command -v apt-get > /dev/null 2>&1; then
-            pkg_manager="apt-get"
-        elif command -v dnf > /dev/null 2>&1; then
-            pkg_manager="dnf"
-        elif command -v microdnf > /dev/null 2>&1; then
-            pkg_manager="microdnf"
-        elif command -v yum > /dev/null 2>&1; then
-            pkg_manager="yum"
+    for ((i=1; i<=retries; i++)); do
+        if curl -o "$output" "$url"; then
+            echo "Download succeeded on attempt $i."
+            return 0
         else
-            log --warn "No known package manager found."
-            return 1
+            echo "Download failed on attempt $i. Retrying in $wait seconds..."
+            sleep $wait
         fi
-
-        echo "$pkg_manager"  
-    }
-
-
-    update_host() {
-        # Updates the system's package list and installs updates.
-        # Logs the start and end of the update process, capturing output of `dnf update` command.
-        # If update is successful, logs success message; if it fails, logs error output and returns 1.
-        
-        case $PKG_MANAGER in
-            apt|apt-get)
-                $PKG_MANAGER update && $PKG_MANAGER upgrade -y
-                ;;
-            dnf|microdnf|yum)
-                $PKG_MANAGER update -y
-                ;;
-            *)
-                log --warn "Unsupported package manager for updating."
-                return 1
-                ;;
-        esac
-    }
-
-
-    install_package() {
-        # Installs provided dependencies using the system's package manager.
-        # Logs installation attempts for each package and installation status.
-        # Allows dynamic adjustment of required dependencies based on different contexts.
-        
-        if [ $# -eq 0 ]; then
-            return 1
-        fi
-            
-        for package_name in "$@"; do
-            log --info "Installing ${package_name} using ${PKG_MANAGER} package manager."
-            case $PKG_MANAGER in
-                apt|apt-get|dnf|microdnf|yum)
-                    $PKG_MANAGER install $package_name -y > /dev/null 2>&1
-                    ;;
-                *)
-                    log --warn "Unsupported package manager for installing packages."
-                    return 1
-                    ;;
-            esac        
-            
-            if [ $? -ne 0 ]; then
-                log --warn "Failed to install $package_name."
-            else
-                log --info "\t$package_name installed successfully."
-            fi
-        done
-    }
-
-
-    remove_package() {
-        # Removes specified packages using the detected package manager.
-        # Parameters:
-        #   $@ - List of package names to remove.
-        # Logs removal status for each package.
-        
-        local pkg_manager=$1
-        local package_name=$2
-
-        log --info "Removing $package_name using $PKG_MANAGER..."
-        for package_name in "$@"; do
-            case $PKG_MANAGER in
-                apt|apt-get|dnf|microdnf|yum)
-                    $PKG_MANAGER remove $package_name -y
-                    ;;
-                *)
-                    log --warn "Unsupported package manager for removing packages."
-                    return 1
-                    ;;
-            esac
-        done
-    }
-
-
-    clean_pkg_manager_cache() {
-        # Cleans the cache of the specified package manager.
-        # Supports apt, apt-get, dnf, microdnf, and yum.
-         
-        case $PKG_MANAGER in
-            apt|apt-get)
-                $PKG_MANAGER clean
-                ;;
-            dnf|microdnf|yum)
-                $PKG_MANAGER clean all
-                ;;
-            *)
-                return 1
-                ;;
-        esac
-    }
-
-
-    remove_orphaned_package() {
-        # Removes orphaned dependencies for the specified package manager.
-        # Supports apt, apt-get, dnf, and microdnf. Logs a warning for yum.
-   
-        case $PKG_MANAGER in
-            apt)
-                apt autoremove -y
-                ;;
-            apt-get)
-                apt-get autoremove -y
-                ;;
-            dnf|microdnf)
-                $PKG_MANAGER autoremove -y
-                ;;
-            yum)
-                log --warn "Yum does not have a built-in equivalent to autoremove."
-                ;;
-            *)
-                log --warn "Unsupported package manager for removing orphaned dependencies."
-                return 1
-                ;;
-        esac
-    }
-
-
-    PKG_MANAGER=$(detect_pkg_manager)
-
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -u|--update)
-                log --info "Starting update process for host and base system files."
-                log --info "Updating $PKG_MANAGER and installed packages..."                
-                update_host > /dev/null 2>&1
-                ;;
-            -c|--clean)
-                log --info "Cleaning the cache for ${PKG_MANAGER}..."
-                clean_pkg_manager_cache > /dev/null 2>&1
-                remove_orphaned_package > /dev/null 2>&1
-                ;;
-            -i|--install)
-                shift
-                packages=("$@")
-                log --info "Installing packages: ${packages[@]}"
-                install_package "${packages[@]}" > /dev/null 2>&1
-                break
-                ;;
-            -r|--remove)
-                shift
-                packages=("$@")
-                log --info "Installing packages: ${packages[@]}"
-                remove_c "${packages[@]}" > /dev/null 2>&1
-                break
-                ;;
-            -h|--help)
-                usage
-                exit 0
-                ;;
-            *)
-                log --info "Unknown option: $1"
-                usage
-                exit 1
-                ;;
-        esac
-        shift
-    done
-}
-
-
-configure_firewall() {
-    # Configure the firewall to allow specific traffic.
-    # Enables and starts firewalld service, sets default target to DROP for all zones,
-    # and adds specified ports and protocols to the firewall rules.
-
-    drop_all_inbound_traffic() {
-        # Set default target to DROP for all firewall zones.
-        # Iterates over each zone and applies the DROP policy.
-        
-        zones=$(firewall-cmd --get-zones)
-
-        for zone in $zones; do
-            firewall-cmd --permanent --zone="$zone" --set-target=DROP
-            echo "Default target for $zone set to DROP."
-        done
-    }
-    
-
-    while [[ "$#" -gt 0 ]]; do
-        case $1 in
-            --enable)
-                shift
-                systemctl enable firewalld > /dev/null 2>&1
-                ;;
-            --start)
-                shift
-                systemctl start firewalld > /dev/null 2>&1
-                ;;
-            --reload)
-                shift
-                firewall-cmd --reload > /dev/null 2>&1
-                ;;
-            --drop-all)
-                shift
-                drop_all_inbound_traffic > /dev/null 2>&1
-                ;;
-            --port)
-                shift
-                port="$1"
-                # shift
-                ;;
-            --protocol)
-                shift
-                protocol="$1"
-                # shift
-                ;;
-            *)
-                log --info "Unknown option: $1"
-                exit 1
-                ;;
-        esac
-        shift
     done
 
-    if [[ -n "$port" && -n "$protocol" ]]; then
-        if firewall-cmd --query-port="$port/$protocol"  > /dev/null 2>&1; then
-            log --info "Port $port/$protocol is already added to the firewall rules."
-        else
-            firewall-cmd --add-port="$port/$protocol" --permanent  > /dev/null 2>&1
-            log --info "Port $port/$protocol has been added to the firewall rules."
-        fi
-    fi
-}    
+    echo "Download failed after $retries attempts."
+    return 1
+}
 
+# Create directory if it doesn't exist
+mkdir -p lib
+
+# Download common.sh with retries
+if ! download_file "<url-to-common.sh>" "lib/common.sh"; then
+    echo "Failed to download common.sh. Exiting."
+    exit 1
+fi
+
+# Source the common.sh file
+source lib/common.sh
 
 main() {
     # Main function to orchestrate the firewall setup.
