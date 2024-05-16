@@ -14,6 +14,7 @@
 # BMS Ports: Modify the BMS_PORTS array to include the necessary BMS ports and protocols.
 
 # TODO :: Integrate functions and additional functionality
+# TODO :: Update to work with DEB and RPM Distrobutions
 
 # Define variables
 IP_LIST=("192.168.1.10" "10.0.0.5")               # List of individual IP addresses
