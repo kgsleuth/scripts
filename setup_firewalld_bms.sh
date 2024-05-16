@@ -17,6 +17,12 @@
 
 
 log() {
+    # Log messages with different severity levels and colors
+    # Parameters:
+    #   $1 - Severity level (info, warn, error, debug, trace)
+    #   $2 - Message to log
+    # Logs messages to the terminal with color formatting
+    
     local level=""
     local message=""
     local color_level=""
@@ -86,11 +92,9 @@ log() {
 
 
 upm() {
-    # This function serves as a utility for managing package updates, clean-ups,
-    # and installations on Linux systems. It detects the system's package manager,
-    # and based on the options provided, it can update the package lists, clean up
-    # unnecessary packages, or install specified packages. The function requires
-    # root privileges to execute package management commands.
+    # Manage package updates, clean-ups, and installations on Linux systems
+    # Detects the system's package manager and performs specified actions
+    # based on the options provided (update, clean, install, remove)
 
     usage() {
         echo "Usage: upm [options]"
@@ -111,8 +115,9 @@ upm() {
 
 
     detect_pkg_manager() {
-        # Detects the available package manager on the system.
-
+        # Detect the available package manager on the system
+        # Returns the package manager command if found, otherwise logs a warning
+        
         local pkg_manager=""
 
         if command -v apt > /dev/null 2>&1; then
@@ -185,8 +190,11 @@ upm() {
 
 
     remove_package() {
-        # Removes a package using the specified package manager.
-
+        # Removes specified packages using the detected package manager.
+        # Parameters:
+        #   $@ - List of package names to remove.
+        # Logs removal status for each package.
+        
         local pkg_manager=$1
         local package_name=$2
 
@@ -207,6 +215,8 @@ upm() {
 
     clean_pkg_manager_cache() {
         # Cleans the cache of the specified package manager.
+        # Supports apt, apt-get, dnf, microdnf, and yum.
+         
         case $PKG_MANAGER in
             apt|apt-get)
                 $PKG_MANAGER clean
@@ -223,6 +233,8 @@ upm() {
 
     remove_orphaned_package() {
         # Removes orphaned dependencies for the specified package manager.
+        # Supports apt, apt-get, dnf, and microdnf. Logs a warning for yum.
+   
         case $PKG_MANAGER in
             apt)
                 apt autoremove -y
@@ -289,21 +301,16 @@ upm() {
 
 
 configure_firewall() {
-    # Configures the system's firewall to allow rsyslog traffic, enabling the
-    # receipt of remote logs. Checks if running inside a Docker container, skips
-    # firewall configurations if true. If not running inside Docker, enables and
-    # starts the firewalld service.
-
-    if [ -f "/.dockerenv" ]; then
-        log --info "Running inside Docker; skipping firewall configuration."
-        return
-    fi
+    # Configure the firewall to allow specific traffic.
+    # Enables and starts firewalld service, sets default target to DROP for all zones,
+    # and adds specified ports and protocols to the firewall rules.
 
     drop_all_inbound_traffic() {
-        # Get a list of all zones
+        # Set default target to DROP for all firewall zones.
+        # Iterates over each zone and applies the DROP policy.
+        
         zones=$(firewall-cmd --get-zones)
 
-        # Iterate over each zone and set the default target to DROP
         for zone in $zones; do
             firewall-cmd --permanent --zone="$zone" --set-target=DROP
             echo "Default target for $zone set to DROP."
@@ -358,61 +365,63 @@ configure_firewall() {
 }    
 
 
-######
 main() {
-  PACKAGES=( firewalld )
-  
-  # Define variables
-  IP_LIST=("192.168.1.10" "10.0.0.5")               # List of individual IP addresses
-  CIDR_LIST=("192.168.1.0/24" "10.0.0.0/24")        # List of IP ranges in CIDR notation
-  BMS_PORTS=("47808/udp" "502/tcp" "3671/udp" "1628/udp" "1629/udp" "1911/tcp" "4911/tcp")
-  
-  
-  log --info "Updating the host and installing required packages"
-      upm --update  
-      log --info "Install necessary dependencies..."
-      upm --install "${PACKAGES[@]}"  
-      log --info "Freeing up space and removing outdated packages by clearing the package manager cache"
-      upm --clean
-  
-      
-  # Install and start firewalld
-  upm --packages firewalld
-  systemctl start firewalld
-  systemctl enable firewalld
-  
-  # Set default policies
-  log --info "Enabling and starting firewall service"
-  configure_firewall  --enable
-  configure_firewall  --start
-  
-  log --info "Setting firewall to drop all inbound connections."
-  configure_firewall  --drop-all 
-  
-  log --info "Configuring syslog reviecer ports."
-  # BMS Ports: "47808/udp" "502/tcp" "3671/udp" "1628/udp" "1629/udp" "1911/tcp" "4911/tcp"
-  configure_firewall  --port 47808  --protocol udp  
-  configure_firewall  --port 3671   --protocol udp  
-  configure_firewall  --port 1628   --protocol udp  
-  configure_firewall  --port 1629   --protocol udp  
-  configure_firewall  --port 502    --protocol tcp  
-  configure_firewall  --port 1911   --protocol tcp  
-  configure_firewall  --port 4911   --protocol tcp  
-  
-  # Allow traffic from specified IP addresses
-  for IP in "${IP_LIST[@]}"; do
-      firewall-cmd --permanent --zone=trusted --add-source=$IP
-  done
-  
-  # Allow traffic from specified IP ranges in CIDR notation
-  for CIDR in "${CIDR_LIST[@]}"; do
-      firewall-cmd --permanent --zone=trusted --add-source=$CIDR
-  done
-  
-  log --info "Loading new configurations"
-  configure_firewall  --reload
+    # Main function to orchestrate the firewall setup.
+    # Updates the host, installs required packages, configures firewalld,
+    # and sets firewall rules for specified IP addresses and BMS ports.
+     
+    packages=( firewalld )
+    ip_list=("192.168.1.10" "10.0.0.5")               # List of individual IP addresses
+    cidr_list=("192.168.1.0/24" "10.0.0.0/24")        # List of IP ranges in CIDR notation
+    
+    
+    log --info "Updating the host and installing required packages"
+    upm --update  
+    log --info "Install necessary dependencies..."
+    upm --install "${packages[@]}"  
+    log --info "Freeing up space and removing outdated packages by clearing the package manager cache"
+    upm --clean
+    
+    upm --packages firewalld
+    systemctl start firewalld
+    systemctl enable firewalld
+    
+    log --info "Enabling and starting firewall service"
+    configure_firewall  --enable
+    configure_firewall  --start
+    
+    log --info "Setting firewall to drop all inbound connections."
+    configure_firewall  --drop-all 
+    
+    log --info "Configuring BMS ports."
+    # BMS Ports: "47808/udp" "502/tcp" "3671/udp" "1628/udp" "1629/udp" "1911/tcp" "4911/tcp"
+    configure_firewall  --port 47808  --protocol udp  
+    configure_firewall  --port 3671   --protocol udp  
+    configure_firewall  --port 1628   --protocol udp  
+    configure_firewall  --port 1629   --protocol udp  
+    configure_firewall  --port 502    --protocol tcp  
+    configure_firewall  --port 1911   --protocol tcp  
+    configure_firewall  --port 4911   --protocol tcp  
 
-  log --info "Restart necessary services to apply the new configurations."
-  systemctl restart firewalld
+    # SSH/PRA Ports: "22/tcp"
+    configure_firewall --port 22 --protocol tcp
+    
+    # Allow traffic from specified IP addresses
+    for ip in "${ip_list[@]}"; do
+      firewall-cmd --permanent --zone=trusted --add-source=$ip
+    done
+    
+    # Allow traffic from specified IP ranges in CIDR notation
+    for cidr in "${cidr_list[@]}"; do
+      firewall-cmd --permanent --zone=trusted --add-source=$cidr
+    done
+    
+    log --info "Loading new configurations"
+    configure_firewall  --reload
+    
+    log --info "Restart necessary services to apply the new configurations."
+    systemctl restart firewalld
 
 }
+
+main
