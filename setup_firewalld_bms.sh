@@ -45,7 +45,7 @@ download_file() {
 mkdir -p lib
 
 # Download common.sh with retries
-if ! download_file "<url-to-common.sh>" "lib/common.sh"; then
+if ! download_file "https://raw.githubusercontent.com/kgsleuth/scripts/main/lib/common.sh" "lib/common.sh"; then
     echo "Failed to download common.sh. Exiting."
     exit 1
 fi

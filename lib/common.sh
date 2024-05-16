@@ -73,6 +73,18 @@ log() {
 }
 
 
+usage() {
+    # Checks if the script is run as root and exits with an error if not.
+    # This ensures the script has necessary permissions for system configuration modification.
+    # If not run as root, it prints an error message to standard error and exits with a status code of 1.
+
+
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "This script must be run as root" 1>&2
+        exit 1
+    fi
+}
+
 upm() {
     # Manage package updates, clean-ups, and installations on Linux systems
     # Detects the system's package manager and performs specified actions
@@ -343,5 +355,325 @@ configure_firewall() {
             firewall-cmd --add-port="$port/$protocol" --permanent  > /dev/null 2>&1
             log --info "Port $port/$protocol has been added to the firewall rules."
         fi
+    fi
+}
+
+
+install_oms_agent() {
+    # Attempts to set up Azure Sentinel connector.
+    # Checks if syslog ports (514 or 6514) are already in use.
+    # If not, downloads and executes Azure Sentinel connector setup script.
+    # Logs outcome of checks and actions for transparency in setup process.
+
+    local workspaceID=$1
+    local primaryKey=$2
+
+    if ss -tulpn | grep -E ":6?514\b"; then
+        log --info "Port 514 or 6514 is open and listening."
+    else
+        log --info "Port 514 or 6514 is not open."
+        log --info "Setting up Azure Sentinel connector..."
+        wget -O cef_installer.py "https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/DataConnectors/CEF/cef_installer.py" >> "$LOG_FILE" 2>&1
+        python3 cef_installer.py "$workspaceID" "$primaryKey" >> "$LOG_FILE" 2>&1
+    fi
+}
+
+
+install_ama_agent() {
+    # Attempts to set up Azure Sentinel connector.
+    # Checks if syslog ports (514 or 6514) are already in use.
+    # If not, downloads and executes Azure Sentinel connector setup script.
+    # Logs outcome of checks and actions for transparency in setup process.
+
+#sudo wget -O Forwarder_AMA_installer.py https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/DataConnectors/Syslog/Forwarder_AMA_installer.py
+#sudo python3 Forwarder_AMA_installer.py
+
+    local workspaceID=$1
+    local primaryKey=$2
+
+    if ss -tulpn | grep -E ":6?514\b"; then
+        log --info "Port 514 or 6514 is open and listening."
+    else
+        log --info "Port 514 or 6514 is not open."
+        log --info "Setting up Azure Sentinel connector..."
+        wget -O cef_installer.py "https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/DataConnectors/CEF/cef_installer.py" >> "$LOG_FILE" 2>&1
+        python3 cef_installer.py "$workspaceID" "$primaryKey" >> "$LOG_FILE" 2>&1
+    fi
+}
+
+
+generate_tls_certificates() {
+    # Ensures the presence of a server's SSL certificate and key, generating new ones if absent.
+    # This function is critical for initializing secure communication channels for services
+    # requiring SSL/TLS, providing a default security posture.
+    CA_CERT="${CA_CERT:-/etc/ssl/certs/rsyslog-ca-cert.pem}"
+    SERVER_CERT="${SERVER_CERT:-/etc/ssl/certs/rsyslog-server-cert.pem}"
+    SERVER_KEY="${SERVER_KEY:-/etc/ssl/private/rsyslog-server-key.pem}"
+
+    update_permission_on_keys() {
+        # Updates the permission and the owner on the server key
+        log --info "Updating permission and owner of $SERVER_KEY & $SERVER_KEY"
+        if [ -n "$SERVER_KEY" ] && [ -f "$SERVER_KEY" ]; then
+            log --info "Adjusting permissions for the private key at $SERVER_KEY."
+            chown root:root "$SERVER_KEY"
+            chmod 600 "$SERVER_KEY"
+        else
+            log --warn "SERVER_KEY is not set or points to a non-existent file $SERVER_KEY. Skipping permission adjustment."
+        fi
+    }
+    generate_self_signed_cert() {
+        # Generates a self-signed SSL certificate and corresponding RSA private key.
+        # This internal utility is targeted towards development or internal network applications,
+        # where the certificate's issuer authenticity is less critical, yet secure communication
+        # is still required.
+
+        # Prepares the necessary directories for storing the CA certificate and server key.
+        mkdir -p "$(dirname "$CA_CERT")" "$(dirname "$SERVER_KEY")"
+
+        # If the CA certificate does not exist, it generates a new one valid for 365 days.
+        if [ ! -f "$CA_CERT" ]; then
+            openssl req -new -x509 -days 365 -nodes \
+                -out "$CA_CERT" -keyout "$SERVER_KEY" \
+                -subj "/C=$COUNTRY/ST=$STATE/L=$CITY/O=$ORGANIZATION/CN=$COMMON_NAME"
+            log --info "Generated self-signed CA certificate."
+            log --info "Created CA certificate: $CA_CERT"
+        else
+            log --info "Using existing CA certificate: $CA_CERT"
+        fi
+
+        # If the server certificate and RSA private key do not exist, it generates a new one
+        if [ ! -f "$SERVER_CERT" ] || [ ! -f "$SERVER_KEY" ]; then
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "$SERVER_KEY" -out "$SERVER_CERT" \
+                -subj "/C=$COUNTRY/ST=$STATE/L=$CITY/O=$ORGANIZATION/CN=$COMMON_NAME"
+            log --info "Generated self-signed server certificate and key."
+            log --info "Created server certificate: $SERVER_CERT"
+            log --info "Created RSA private key: $SERVER_KEY"
+        else
+            log --info "Using existing server certificate: $SERVER_CERT"
+            log --info "Using existing RSA private key: $SERVER_KEY"
+        fi
+    }
+
+    # Verifies the existence of the server certificate and key, generating new ones if necessary.
+    if [ ! -f "$SERVER_CERT" ] || [ ! -f "$SERVER_KEY" ]; then
+        log --info "Certificate or key not found. Generating self-signed certificate."
+        generate_self_signed_cert >/dev/null 2>&1
+    else
+        log --info "Using provided certificate and key."
+        log --info "Using existing CA certificate: $CA_CERT"
+        log --info "Using existing server certificate: $SERVER_CERT"
+        log --info "Using existing RSA private key: $SERVER_KEY"
+    fi
+
+    update_permission_on_keys
+}
+
+
+generate_self_signed_cert_if_none_provided() {
+    # Checks for existence of SSL certificate and key.
+    # Generates a new self-signed certificate and key pair if either is not found.
+    # Ensures SSL/TLS services have necessary files to start securely.
+
+    if [ ! -f "$SERVER_CERT" ] || [ ! -f "$SERVER_KEY" ]; then
+        log --info "Certificate or key not found. Generating self-signed certificate."
+        generate_self_signed_cert >/dev/null 2>&1
+    else
+        log --info "Using provided certificate and key."
+        log --info "Using existing CA certificate: $CA_CERT"
+        log --info "Using existing server certificate: $SERVER_CERT"
+        log --info "Using existing RSA private key: $SERVER_KEY"
+    fi
+}
+
+
+update_permission_on_keys() {
+    # Updates the permission and the owner on the server key
+
+    log --info "Updating permission and owner of $SERVER_KEY & $SERVER_KEY"
+    if [ -n "$SERVER_KEY" ] && [ -f "$SERVER_KEY" ]; then
+        log --info "Adjusting permissions for the private key at $SERVER_KEY."
+        chown root:root "$SERVER_KEY"
+        chmod 600 "$SERVER_KEY"
+    else
+        log --warn "SERVER_KEY is not set or points to a non-existent file $SERVER_KEY. Skipping permission adjustment."
+    fi
+}
+
+
+configure_selinux() {
+    # Configures SELinux for specified services to enhance security. Iterates
+    # over services, checks SELinux installation, and applies custom SELinux
+    # policies if applicable. Skips configuration if running inside Docker or
+    # SELinux is not installed. Logs actions and SELinux status. Accepts
+    # service names as positional parameters.
+
+    usage() {
+        echo "Usage: configure_selinux [options]"
+        echo "Usage: "This script must be run as root.""
+        echo "  -b, --bootstrap  Bootstrap option, does not take in arguments"
+        echo "                   and will review all running services on the"
+        echo "                   host, and create custom SELinux policies as"
+        echo "                   needed."
+        echo "  -s, --service    Followed by one or more services to create"
+        echo "                   custom SELinux policies as needed."
+        echo "  -h, --help       Display this help and exit."
+        echo ""
+        echo "Examples:"
+        echo "  configure_selinux --bootstrap"
+        echo "  configure_selinux --service firewalld rsyslog"
+    }
+
+
+    # Parse command-line arguments manually
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -b|--bootstrap)
+                # Get running services for bootstrap option
+                readarray -t services < <(systemctl list-units --type=service \
+                    --state=running | grep -o -E "\w+.service" | sed -E "s/\..*//g")
+                shift
+                ;;
+            -s|--service)
+                shift
+                services=("$@")
+                break
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                log --info "Programming error"
+                exit 3
+                ;;
+        esac
+    done
+
+
+    sed -E -i 's/SELINUX=(disabled|permissive)/SELINUX=enforcing/g' /etc/selinux/config
+
+
+    create_selinux_policy_for_service() {
+        # This function creates and applies a custom SELinux policy for a specified
+        # service. It restarts the service to generate SELinux denials, which are
+        # then used to create a custom policy module.
+
+        local service_name=$1
+
+        if [[ -z "$service_name" ]]; then
+            log --info "Usage: create_selinux_policy_for_service <service-name>"
+            return 1
+        fi
+
+        systemctl restart "$service_name"
+
+        ausearch -m avc -ts recent  |\
+            grep "$service_name"    |\
+            audit2allow -M           \
+            "custom_${service_name}_policy"
+
+        if [ -f "custom_${service_name}_policy.pp" ]; then
+            semodule -i "custom_${service_name}_policy.pp"
+        fi
+    }
+
+
+    if [ -f "/.dockerenv" ]; then
+        log --info "Running inside Docker, skipping SELinux configurations."
+    else
+        if command -v sestatus &>/dev/null; then
+            log --info "SELinux is installed, proceeding with SELinux port configuration."
+            log --info "Setting SELinux to permissive mode to collect denials:"
+            setenforce 0
+            log --info "Services to review: ${services[@]}"
+            for service in "${services[@]}"; do
+                log --info "Generating SELinux policy module for ${service}."
+                log --info "Installing the custom SELinux ${service}_custom_policy.pp module."
+                create_selinux_policy_for_service "$service"  > /dev/null 2>&1
+                log --info "Custom SELinux policy for $service has been created and applied."
+            done
+            setenforce 1
+            log --info "Setting SELinux back to enforcing mode."
+        else
+            log --info "SELinux is not installed. Skipping SELinux configurations."
+        fi
+    fi
+}
+
+
+config_builder() {
+    local config_path=$1
+    local config_content=$2
+    local config_name=$3
+
+    log --info "Checking and updating ${config_name} configuration as necessary..."
+
+    mkdir -p "$(dirname "$config_path")"
+
+    if [ -f "$config_path" ]; then
+        existing_content=$(cat "$config_path")
+
+        yes | cp --force "$config_path" "${config_path}.bak" >/dev/null 2>&1
+
+        log --info "Backup of existing ${config_name} configuration created at ${config_path}.bak"
+
+        if [ "$config_content" = "$existing_content" ]; then
+            log --info "${config_name} configuration already exists and is up to date: $config_path"
+        else
+            log --info "${config_name} configuration exists but is different. Updating: $config_path"
+            echo "$config_content" > "$config_path"
+        fi
+    else
+        log --info "Creating ${config_name} configuration at $config_path."
+        echo "$config_content" > "$config_path"
+    fi
+}
+
+
+add_cron_job_if_not_exists() {
+    local cron_string=""
+    local command=""
+
+    # Parse the command line arguments
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --cron-string)
+                shift
+                cron_string="$1"
+                ;;
+            --command)
+                shift
+                command="$1"
+                ;;
+            *)
+                echo "Unknown option: $1"
+                echo "Usage: add_cron_job_if_not_exists --cron-string '<cron_string>' --command '<command>'"
+                return 1
+                ;;
+        esac
+        shift
+    done
+
+    # Check if the required arguments are provided
+    if [ -z "$cron_string" ] || [ -z "$command" ]; then
+        echo "Error: Both --cron-string and --command must be provided."
+        echo "Usage: add_cron_job_if_not_exists --cron-string '<cron_string>' --command '<command>'"
+        return 1
+    fi
+
+    local cron_job="$cron_string $command"
+
+    # Check if the cron job exists in the current crontab
+    if ! (crontab -l 2>/dev/null | grep -Fq "$cron_job"); then
+        # Add the cron job to the crontab if it does not exist
+        (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
+        echo "Cron job added: $cron_job"
+    else
+        echo "Cron job already exists: $cron_job"
     fi
 }
