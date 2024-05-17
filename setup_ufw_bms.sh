@@ -22,6 +22,7 @@ LIFECYCLE="PROD"
 
 # Enable UFW
 echo "Enabling UFW..."
+systemctl enable ufw
 ufw --force enable
 
 # Set default policies based on lifecycle
@@ -40,10 +41,16 @@ ufw allow in on ens160
 ufw allow out on ens160
 
 # List of allowed IPs for ens192
-ALLOWED_IPS_192=( "192.168.130.10" "192.168.130.20" )
+ALLOWED_IPS_192=(
+  "192.168.130.10"
+  "192.168.130.20"
+   )
 
 # List of allowed IPs for ens220
-ALLOWED_IPS_220=( "192.168.138.10" "192.168.138.20" )
+ALLOWED_IPS_220=(
+  "192.168.138.10"
+  "192.168.138.20"
+  )
 
 # Configure ens192 based on lifecycle
 echo "Configuring rules for ens192 based on lifecycle ($LIFECYCLE)..."
