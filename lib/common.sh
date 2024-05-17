@@ -293,11 +293,10 @@ upm() {
     done
 }
 
-
 configure_firewall() {
-    # Configure the firewall to allow specific traffic.
+    # Configure the firewall to allow or deny specific traffic.
     # Enables and starts firewalld service, sets default target to DROP for all zones,
-    # and adds specified ports and protocols to the firewall rules.
+    # adds specified ports and protocols to the firewall rules, and handles allowed/denied IPs.
 
     drop_all_inbound_traffic() {
         # Set default target to DROP for all firewall zones.
@@ -311,37 +310,81 @@ configure_firewall() {
         done
     }
 
+    allow_ip_inbound() {
+        local ip_list=("$@")
+        for ip in "${ip_list[@]}"; do
+            firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='$ip' accept"
+            echo "Allowed inbound IP: $ip"
+        done
+    }
+
+    allow_ip_outbound() {
+        local ip_list=("$@")
+        for ip in "${ip_list[@]}"; do
+            firewall-cmd --permanent --add-rich-rule="rule family='ipv4' destination address='$ip' accept"
+            echo "Allowed outbound IP: $ip"
+        done
+    }
+
+    deny_ip_inbound() {
+        local ip_list=("$@")
+        for ip in "${ip_list[@]}"; do
+            firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='$ip' drop"
+            echo "Denied inbound IP: $ip"
+        done
+    }
+
+    deny_ip_outbound() {
+        local ip_list=("$@")
+        for ip in "${ip_list[@]}"; do
+            firewall-cmd --permanent --add-rich-rule="rule family='ipv4' destination address='$ip' drop"
+            echo "Denied outbound IP: $ip"
+        done
+    }
+
+    allowed_ips=()
+    denied_ips=()
 
     while [[ "$#" -gt 0 ]]; do
         case $1 in
             --enable)
-                shift
                 systemctl enable firewalld > /dev/null 2>&1
                 ;;
             --start)
-                shift
                 systemctl start firewalld > /dev/null 2>&1
                 ;;
             --reload)
-                shift
                 firewall-cmd --reload > /dev/null 2>&1
                 ;;
             --drop-all)
-                shift
                 drop_all_inbound_traffic > /dev/null 2>&1
                 ;;
             --port)
+                port="$2"
                 shift
-                port="$1"
-                # shift
                 ;;
             --protocol)
+                protocol="$2"
                 shift
-                protocol="$1"
-                # shift
+                ;;
+            --allow-inbound)
+                allowed_ips+=("$2")
+                shift
+                ;;
+            --allow-outbound)
+                allowed_ips+=("$2")
+                shift
+                ;;
+            --deny-inbound)
+                denied_ips+=("$2")
+                shift
+                ;;
+            --deny-outbound)
+                denied_ips+=("$2")
+                shift
                 ;;
             *)
-                log --info "Unknown option: $1"
+                echo "Unknown option: $1"
                 exit 1
                 ;;
         esac
@@ -349,13 +392,26 @@ configure_firewall() {
     done
 
     if [[ -n "$port" && -n "$protocol" ]]; then
-        if firewall-cmd --query-port="$port/$protocol"  > /dev/null 2>&1; then
-            log --info "Port $port/$protocol is already added to the firewall rules."
+        if firewall-cmd --query-port="$port/$protocol" > /dev/null 2>&1; then
+            echo "Port $port/$protocol is already added to the firewall rules."
         else
-            firewall-cmd --add-port="$port/$protocol" --permanent  > /dev/null 2>&1
-            log --info "Port $port/$protocol has been added to the firewall rules."
+            firewall-cmd --add-port="$port/$protocol" --permanent > /dev/null 2>&1
+            echo "Port $port/$protocol has been added to the firewall rules."
         fi
     fi
+
+    if [[ ${#allowed_ips[@]} -gt 0 ]]; then
+        allow_ip_inbound "${allowed_ips[@]}"
+        allow_ip_outbound "${allowed_ips[@]}"
+    fi
+
+    if [[ ${#denied_ips[@]} -gt 0 ]]; then
+        deny_ip_inbound "${denied_ips[@]}"
+        deny_ip_outbound "${denied_ips[@]}"
+    fi
+
+    firewall-cmd --reload > /dev/null 2>&1
+    echo "Firewall rules have been reloaded."
 }
 
 
