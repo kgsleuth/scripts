@@ -1,9 +1,20 @@
 log() {
-    # Log messages with different severity levels and colors
-    # Parameters:
-    #   $1 - Severity level (info, warn, error, debug, trace)
-    #   $2 - Message to log
-    # Logs messages to the terminal with color formatting
+    # Log messages with severity levels and colors.
+    # Parameters: $1 - level (info, warn, error, debug, trace), $2 - message.
+    # Logs messages to the terminal and syslog with color formatting.
+
+    usage() {
+        echo "Usage: log [option] message"
+        echo "Options:"
+        echo "  -i, --info    Info level message"
+        echo "  -w, --warn    Warning level message"
+        echo "  -e, --error   Error level message"
+        echo "  -d, --debug   Debug level message"
+        echo "  -t, --trace   Trace level message"
+        echo "Example:"
+        echo "  log -i 'This is an info message'"
+        echo "  log --warn 'This is a warning'"
+    }
 
     local level=""
     local message=""
@@ -17,7 +28,7 @@ log() {
     case $1 in
         -i|--info)
             level="[INFO]"
-            message="${@:2}"
+            message="${*:2}"
             color_level="\033[0;32m"
             color_message="\033[0;94m"
             color_time="\033[0;33m"
@@ -25,7 +36,7 @@ log() {
             ;;
         -w|--warn)
             level="[WARN]"
-            message="${@:2}"
+            message="${*:2}"
             color_level="\033[0;33m"
             color_message="\033[0;96m"
             color_time="\033[0;33m"
@@ -33,7 +44,7 @@ log() {
             ;;
         -e|--error)
             level="[ERROR]"
-            message="${@:2}"
+            message="${*:2}"
             color_level="\033[0;31m"
             color_message="\033[0;96m"
             color_time="\033[0;33m"
@@ -41,7 +52,7 @@ log() {
             ;;
         -d|--debug)
             level="[DEBUG]"
-            message="${@:2}"
+            message="${*:2}"
             color_level="\033[0;36m"
             color_message="\033[0;96m"
             color_time="\033[0;33m"
@@ -49,7 +60,7 @@ log() {
             ;;
         -t|--trace)
             level="[TRACE]"
-            message="${@:2}"
+            message="${*:2}"
             color_level="\033[0;37m"
             color_message="\033[0;96m"
             color_time="\033[0;33m"
@@ -57,11 +68,12 @@ log() {
             ;;
         *)
             level="[UNKNOWN]"
-            message="$@"
+            message="$*"
             color_level="\033[0m"
             color_message="\033[0;96m"
             color_time="\033[0;33m"
             syslog_severity="notice"
+            usage
             ;;
     esac
 
@@ -69,7 +81,8 @@ log() {
     echo -e "$color_time$(date +'%Y-%m-%d %H:%M:%S') $color_level$level\033[0m - $color_message$message\033[0m"
 
     # Additionally, log to syslog with the specified severity level, including the level text
-    logger -p "user.$syslog_severity" -t "$0" [$$] "$level $message"
+    logger -p "user.$syslog_severity" -t "$0" "[$pid] $level $message"
+
 }
 
 
@@ -85,6 +98,7 @@ usage() {
     fi
 }
 
+
 upm() {
     # Manage package updates, clean-ups, and installations on Linux systems
     # Detects the system's package manager and performs specified actions
@@ -97,14 +111,15 @@ upm() {
         echo "Options:"
         echo "  -u, --update                    Updates the system's package lists and installs available updates."
         echo "  -c, --clean                     Cleans up the package manager's cache and removes orphaned dependencies."
-        echo "  -p, --packages <package_names>  Installs specified packages. Multiple packages can be specified separated by spaces."
-        echo "  -r, --remove   <package_names>  Removes specified packages. Multiple packages can be specified separated by spaces."
+        echo "  -i, --install <package_names>   Installs specified packages. Multiple packages can be specified separated by spaces."
+        echo "  -r, --remove <package_names>    Removes specified packages. Multiple packages can be specified separated by spaces."
         echo "  -h, --help                      Displays this help information and exits."
         echo ""
         echo "Examples:"
         echo "  upm --update                    Update the system's package list and install updates."
         echo "  upm --clean                     Clean up unnecessary packages and cache."
-        echo "  upm --packages nano vim         Install 'nano' and 'vim' packages."
+        echo "  upm --install nano vim          Install 'nano' and 'vim' packages."
+        echo "  upm --remove nano vim           Remove 'nano' and 'vim' packages."
     }
 
 
@@ -258,25 +273,25 @@ upm() {
             -u|--update)
                 log --info "Starting update process for host and base system files."
                 log --info "Updating $PKG_MANAGER and installed packages..."
-                update_host > /dev/null 2>&1
+                update_host
                 ;;
             -c|--clean)
                 log --info "Cleaning the cache for ${PKG_MANAGER}..."
-                clean_pkg_manager_cache > /dev/null 2>&1
-                remove_orphaned_package > /dev/null 2>&1
+                clean_pkg_manager_cache
+                remove_orphaned_package
                 ;;
             -i|--install)
                 shift
                 packages=("$@")
-                log --info "Installing packages: ${packages[@]}"
-                install_package "${packages[@]}" > /dev/null 2>&1
+                log --info "Installing packages: ${packages[*]}"
+                install_package "${packages[@]}"
                 break
                 ;;
             -r|--remove)
                 shift
                 packages=("$@")
-                log --info "Installing packages: ${packages[@]}"
-                remove_c "${packages[@]}" > /dev/null 2>&1
+                log --info "Removing packages: ${packages[*]}"
+                remove_c "${packages[@]}"
                 break
                 ;;
             -h|--help)
@@ -293,10 +308,29 @@ upm() {
     done
 }
 
+
 configure_firewall() {
     # Configure the firewall to allow or deny specific traffic.
     # Enables and starts firewalld service, sets default target to DROP for all zones,
     # adds specified ports and protocols to the firewall rules, and handles allowed/denied IPs.
+
+    usage() {
+        echo "Usage: configure_firewall [options]"
+        echo "Options:"
+        echo "  --enable                  Enable firewalld service"
+        echo "  --start                   Start firewalld service"
+        echo "  --reload                  Reload firewalld rules"
+        echo "  --drop-all                Drop all inbound traffic by default"
+        echo "  --port &lt;port&gt;             Specify port to allow"
+        echo "  --protocol &lt;protocol&gt;     Specify protocol for the port"
+        echo "  --allow-inbound &lt;IP&gt;      Allow inbound traffic from IP"
+        echo "  --allow-outbound &lt;IP&gt;     Allow outbound traffic to IP"
+        echo "  --deny-inbound &lt;IP&gt;       Deny inbound traffic from IP"
+        echo "  --deny-outbound &lt;IP&gt;      Deny outbound traffic to IP"
+        echo "Example:"
+        echo "  configure_firewall --enable --start --port 80 --protocol tcp"
+    }
+
 
     drop_all_inbound_traffic() {
         # Set default target to DROP for all firewall zones.
@@ -306,39 +340,43 @@ configure_firewall() {
 
         for zone in $zones; do
             firewall-cmd --permanent --zone="$zone" --set-target=DROP
-            echo "Default target for $zone set to DROP."
+            log --info "Default target for $zone set to DROP."
         done
     }
+
 
     allow_ip_inbound() {
         local ip_list=("$@")
         for ip in "${ip_list[@]}"; do
             firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='$ip' accept"
-            echo "Allowed inbound IP: $ip"
+            log --info "Allowed inbound IP: $ip"
         done
     }
+
 
     allow_ip_outbound() {
         local ip_list=("$@")
         for ip in "${ip_list[@]}"; do
             firewall-cmd --permanent --add-rich-rule="rule family='ipv4' destination address='$ip' accept"
-            echo "Allowed outbound IP: $ip"
+            log --info "Allowed outbound IP: $ip"
         done
     }
+
 
     deny_ip_inbound() {
         local ip_list=("$@")
         for ip in "${ip_list[@]}"; do
             firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='$ip' drop"
-            echo "Denied inbound IP: $ip"
+            log --info "Denied inbound IP: $ip"
         done
     }
+
 
     deny_ip_outbound() {
         local ip_list=("$@")
         for ip in "${ip_list[@]}"; do
             firewall-cmd --permanent --add-rich-rule="rule family='ipv4' destination address='$ip' drop"
-            echo "Denied outbound IP: $ip"
+            log --info "Denied outbound IP: $ip"
         done
     }
 
@@ -348,16 +386,16 @@ configure_firewall() {
     while [[ "$#" -gt 0 ]]; do
         case $1 in
             --enable)
-                systemctl enable firewalld > /dev/null 2>&1
+                systemctl enable firewalld
                 ;;
             --start)
-                systemctl start firewalld > /dev/null 2>&1
+                systemctl start firewalld
                 ;;
             --reload)
-                firewall-cmd --reload > /dev/null 2>&1
+                firewall-cmd --reload
                 ;;
             --drop-all)
-                drop_all_inbound_traffic > /dev/null 2>&1
+                drop_all_inbound_traffic
                 ;;
             --port)
                 port="$2"
@@ -384,7 +422,8 @@ configure_firewall() {
                 shift
                 ;;
             *)
-                echo "Unknown option: $1"
+                usage
+                log --warn "Unknown option: $1"
                 exit 1
                 ;;
         esac
@@ -393,10 +432,10 @@ configure_firewall() {
 
     if [[ -n "$port" && -n "$protocol" ]]; then
         if firewall-cmd --query-port="$port/$protocol" > /dev/null 2>&1; then
-            echo "Port $port/$protocol is already added to the firewall rules."
+            log --warn "Port $port/$protocol is already added to the firewall rules."
         else
             firewall-cmd --add-port="$port/$protocol" --permanent > /dev/null 2>&1
-            echo "Port $port/$protocol has been added to the firewall rules."
+            log --info "Port $port/$protocol has been added to the firewall rules."
         fi
     fi
 
@@ -411,7 +450,7 @@ configure_firewall() {
     fi
 
     firewall-cmd --reload > /dev/null 2>&1
-    echo "Firewall rules have been reloaded."
+    log --info "Firewall rules have been reloaded."
 }
 
 
@@ -554,20 +593,18 @@ update_permission_on_keys() {
 configure_selinux() {
     # Configures SELinux for specified services to enhance security. Iterates
     # over services, checks SELinux installation, and applies custom SELinux
-    # policies if applicable. Skips configuration if running inside Docker or
-    # SELinux is not installed. Logs actions and SELinux status. Accepts
-    # service names as positional parameters.
+    # policies if applicable. Logs actions and SELinux status. Accepts service
+    # names as positional parameters.
 
     usage() {
         echo "Usage: configure_selinux [options]"
-        echo "Usage: "This script must be run as root.""
-        echo "  -b, --bootstrap  Bootstrap option, does not take in arguments"
-        echo "                   and will review all running services on the"
-        echo "                   host, and create custom SELinux policies as"
-        echo "                   needed."
-        echo "  -s, --service    Followed by one or more services to create"
-        echo "                   custom SELinux policies as needed."
-        echo "  -h, --help       Display this help and exit."
+        echo "This script must be run as root."
+        echo "Options:"
+        echo "  -b, --bootstrap   Review all running services and create"
+        echo "                    custom SELinux policies as needed."
+        echo "  -s, --service     Specify one or more services to create"
+        echo "                    custom SELinux policies."
+        echo "  -h, --help        Display this help and exit."
         echo ""
         echo "Examples:"
         echo "  configure_selinux --bootstrap"
@@ -575,13 +612,13 @@ configure_selinux() {
     }
 
 
-    # Parse command-line arguments manually
+    # Parse command-line arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -b|--bootstrap)
                 # Get running services for bootstrap option
-                readarray -t services < <(systemctl list-units --type=service \
-                    --state=running | grep -o -E "\w+.service" | sed -E "s/\..*//g")
+                readarray -t services < <(systemctl list-units --type=service --state=running |\
+                     grep -o -E "\w+.service" | sed -E "s/\..*//g")
                 shift
                 ;;
             -s|--service)
@@ -598,14 +635,12 @@ configure_selinux() {
                 break
                 ;;
             *)
-                log --info "Programming error"
-                exit 3
+                log --info "Unknown option: $1"
+                usage
+                exit 1
                 ;;
         esac
     done
-
-
-    sed -E -i 's/SELINUX=(disabled|permissive)/SELINUX=enforcing/g' /etc/selinux/config
 
 
     create_selinux_policy_for_service() {
@@ -613,10 +648,18 @@ configure_selinux() {
         # service. It restarts the service to generate SELinux denials, which are
         # then used to create a custom policy module.
 
+        usage() {
+            echo "Usage: create_selinux_policy_for_service &lt;service-name&gt;"
+            echo "Creates and applies a custom SELinux policy for the specified service."
+            echo "Arguments:"
+            echo "  <service-name>  The name of the service for which to create the policy."
+        }
+
         local service_name=$1
 
         if [[ -z "$service_name" ]]; then
             log --info "Usage: create_selinux_policy_for_service <service-name>"
+            usage
             return 1
         fi
 
@@ -633,26 +676,28 @@ configure_selinux() {
     }
 
 
-    if [ -f "/.dockerenv" ]; then
-        log --info "Running inside Docker, skipping SELinux configurations."
-    else
-        if command -v sestatus &>/dev/null; then
-            log --info "SELinux is installed, proceeding with SELinux port configuration."
-            log --info "Setting SELinux to permissive mode to collect denials:"
-            setenforce 0
-            log --info "Services to review: ${services[@]}"
-            for service in "${services[@]}"; do
-                log --info "Generating SELinux policy module for ${service}."
-                log --info "Installing the custom SELinux ${service}_custom_policy.pp module."
-                create_selinux_policy_for_service "$service"  > /dev/null 2>&1
-                log --info "Custom SELinux policy for $service has been created and applied."
-            done
-            setenforce 1
-            log --info "Setting SELinux back to enforcing mode."
-        else
-            log --info "SELinux is not installed. Skipping SELinux configurations."
-        fi
+    if ! command -v sestatus &> /dev/null; then
+        log --info "SELinux is not installed. Skipping SELinux configurations."
+        return
     fi
+
+    log --info "SELinux is installed, proceeding with SELinux port configuration."
+    log --info "Setting SELinux to permissive mode to collect denials."
+    setenforce 0
+
+    log --info "Services to review: ${services[*]}"
+    for service in "${services[@]}"; do
+        log --info "Generating SELinux policy module for ${service}."
+        create_selinux_policy_for_service "$service" > /dev/null 2>&1
+        log --info "Custom SELinux policy for $service has been created and applied."
+    done
+
+    log --info "Setting SELinux back to enforcing mode."
+    setenforce 1
+
+    log --info "Setting SELinux to enforcing mode in the configuration file."
+    sed -E -i 's/SELINUX=(disabled|permissive)/SELINUX=enforcing/g' /etc/selinux/config
+
 }
 
 
@@ -668,7 +713,7 @@ config_builder() {
     if [ -f "$config_path" ]; then
         existing_content=$(cat "$config_path")
 
-        yes | cp --force "$config_path" "${config_path}.bak" >/dev/null 2>&1
+        cp --force "$config_path" "${config_path}.bak" >/dev/null 2>&1
 
         log --info "Backup of existing ${config_name} configuration created at ${config_path}.bak"
 
@@ -688,6 +733,11 @@ config_builder() {
 add_cron_job_if_not_exists() {
     local cron_string=""
     local command=""
+
+    usage() {
+        echo "Usage: add_cron_job_if_not_exists --cron-string '&lt;cron_string&gt;' --command '&lt;command&gt;'"
+    }
+
 
     # Parse the command line arguments
     while [[ "$#" -gt 0 ]]; do
@@ -711,19 +761,17 @@ add_cron_job_if_not_exists() {
 
     # Check if the required arguments are provided
     if [ -z "$cron_string" ] || [ -z "$command" ]; then
-        echo "Error: Both --cron-string and --command must be provided."
-        echo "Usage: add_cron_job_if_not_exists --cron-string '<cron_string>' --command '<command>'"
+        log --error "Error: Both --cron-string and --command must be provided."
+        usage
         return 1
     fi
 
     local cron_job="$cron_string $command"
 
-    # Check if the cron job exists in the current crontab
     if ! (crontab -l 2>/dev/null | grep -Fq "$cron_job"); then
-        # Add the cron job to the crontab if it does not exist
         (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
-        echo "Cron job added: $cron_job"
+        log --info  "Cron job added: $cron_job"
     else
-        echo "Cron job already exists: $cron_job"
+        log --info  "Cron job already exists: $cron_job"
     fi
 }
