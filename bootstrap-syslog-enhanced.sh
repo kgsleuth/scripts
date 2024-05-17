@@ -184,10 +184,8 @@ EOF
 )
 
 
-main() {
+main(){
     # Define local variables for the azure workspace and secret
-    local azure_workspace=$1
-    local secret_key=$2
 
     usage
 
@@ -196,9 +194,9 @@ main() {
     packages=( python3 policycoreutils-python-utils rsyslog rsyslog-gnutls )
 
     log --info "Updating the host and installing required packages"
-    upm --update  
+    upm --update
     log --info "Install necessary dependencies..."
-    upm --install "${packages[@]}"  
+    upm --install "${packages[@]}"
     log --info "Freeing up space and removing outdated packages by clearing the package manager cache"
     upm --clean
 
@@ -207,8 +205,8 @@ main() {
     log --info "Generating a self-signed certificate for TLS if none is provided, ensuring secure communication for syslog over TLS"
     generate_tls_certificates
 
-    [ ! -f "/.dockerenv" ] && log --info "Installing the Azure Monitor Agent" || log --info "Skipping OMS Install, in staging environment"
-    [ ! -f "/.dockerenv" ] && install_oms_agent $azure_workspace $secret_key
+    [ ! -f "/.dockerenv" ] && log --info "Installing the Azure Monitor Agent" || log --info "Skipping AMA Install, in staging environment"
+    [ ! -f "/.dockerenv" ] && install_ama_agent
 
     log --info "Configure syslog services for log rotation and secure reception."
     config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
@@ -220,12 +218,12 @@ main() {
     configure_firewall  --start
 
     log --info "Setting firewall to drop all inbound connections."
-    configure_firewall  --drop-all 
+    configure_firewall  --drop-all
 
     log --info "Configuring syslog reviecer ports."
-    configure_firewall  --port 514  --protocol udp  
-    configure_firewall  --port 514  --protocol tcp  
-    configure_firewall  --port 6514 --protocol tcp  
+    configure_firewall  --port 514  --protocol udp
+    configure_firewall  --port 514  --protocol tcp
+    configure_firewall  --port 6514 --protocol tcp
 
     log --info "Loading new configurations"
     configure_firewall  --reload
@@ -235,14 +233,15 @@ main() {
     systemctl restart rsyslog
 
     log --info "Creating a CRON job to delete logs older than 3 days."
-    add_cron_job_if_not_exists --cron-string "0 */4 * * *" --command "/usr/bin/find /var/log -type f -mtime +3 -exec rm -f {} \;"
+    add_cron_job_if_not_exists --cron-string "0 */4 * * *" \
+                               --command "/usr/bin/find /var/log -type f -mtime +3 -exec rm -f {} \;"
 
     log --info "Configuring security profiles for SELinux."
     configure_selinux --bootstrap
-    
+
     log --info "Script execution completed."
 }
 
 
 # This is the entry point of the script, and checks if both azure_workspace and secret_key variables are provided
-main $1 $2
+main

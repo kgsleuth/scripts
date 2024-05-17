@@ -441,19 +441,13 @@ install_ama_agent() {
     # If not, downloads and executes Azure Sentinel connector setup script.
     # Logs outcome of checks and actions for transparency in setup process.
 
-#sudo wget -O Forwarder_AMA_installer.py https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/DataConnectors/Syslog/Forwarder_AMA_installer.py
-#sudo python3 Forwarder_AMA_installer.py
-
-    local workspaceID=$1
-    local primaryKey=$2
-
     if ss -tulpn | grep -E ":6?514\b"; then
         log --info "Port 514 or 6514 is open and listening."
     else
         log --info "Port 514 or 6514 is not open."
         log --info "Setting up Azure Sentinel connector..."
-        wget -O cef_installer.py "https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/DataConnectors/CEF/cef_installer.py" >> "$LOG_FILE" 2>&1
-        python3 cef_installer.py "$workspaceID" "$primaryKey" >> "$LOG_FILE" 2>&1
+        wget -O Forwarder_AMA_installer.py https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/DataConnectors/Syslog/Forwarder_AMA_installer.py
+        python3 Forwarder_AMA_installer.py
     fi
 }
 
