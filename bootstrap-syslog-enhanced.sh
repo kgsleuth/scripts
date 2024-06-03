@@ -94,21 +94,24 @@ LOGROTATE_CONF=$(cat <<'EOF'
     rotate 3
     daily
     size 100M
-    total size 20G
     compress
     delaycompress
     missingok
     notifempty
     create 0640 root adm
     sharedscripts
-    # postrotate
-    #     /usr/sbin/logrotate /etc/logrotate.conf
-    #     total_size=$(du -sh /var/log | cut -f1)
-    #     if [ "$(echo "$total_size > 20G" | bc)" -eq 1 ]; then
-    #         echo "Total log size exceeds 20 gigabytes. Deleting older logs..."
-    #         find /var/log -type f -mtime +3 -exec rm {} \;
-    #     fi
-    # endscript
+    postrotate
+        # Calculate the total size of logs in kilobytes for comparison
+        total_size_kb=$(du -sk /var/log | cut -f1)
+
+        # Check if the total size exceeds 20 GB (20*1024*1024 KB)
+        if [ "$total_size_kb" -gt $((10*1024*1024)) ]; then
+            echo "Total log size exceeds 20 gigabytes. Deleting older logs..."
+
+            # Delete logs older than three days
+            find /var/log -type f -mtime +3 -exec rm {} \;
+        fi
+    endscript
 }
 EOF
 )
@@ -243,6 +246,21 @@ main(){
     
     systemctl enable crond
     systemctl start crond
+
+    log --info "Cleaning up any existing logs, older than 3 days."
+    find /var/log -type f -mtime +3 -exec rm -f {} \;
+
+    # Adjust systemd-journald settings to optimize log storage
+    sed -i 's/#SystemMaxUse=/SystemMaxUse=200M/' /etc/systemd/journald.conf
+    sed -i 's/#SystemKeepFree=/SystemKeepFree=500M/' /etc/systemd/journald.conf
+    sed -i 's/#SystemMaxFileSize=/SystemMaxFileSize=50M/' /etc/systemd/journald.conf
+    sed -i 's/#SystemMaxFiles=/SystemMaxFiles=4/' /etc/systemd/journald.conf
+
+    # Restart systemd-journald to apply changes
+    systemctl restart systemd-journald
+
+    # Vacuum logs immediately to free up space
+    journalctl --vacuum-size=200M
 
     log --info "Configuring security profiles for SELinux."
     configure_selinux --bootstrap
