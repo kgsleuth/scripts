@@ -235,6 +235,11 @@ main(){
     log --info "Creating a CRON job to delete logs older than 3 days."
     add_cron_job_if_not_exists --cron-string "0 */4 * * *" \
                                --command "/usr/bin/find /var/log -type f -mtime +3 -exec rm -f {} \;"
+
+
+    log --info "Creating a CRON job to update the host at 2 am nightly."
+    add_cron_job_if_not_exists --cron-string "0 2 * * *" \
+                               --command "/usr/bin/dnf update --refresh && /usr/bin/dnf upgrade && /usr/bin/dnf clean all"
     
     systemctl enable crond
     systemctl start crond
