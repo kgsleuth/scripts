@@ -106,7 +106,7 @@ LOGROTATE_CONF=$(cat <<'EOF'
 
         # Check if the total size exceeds 20 GB (20*1024*1024 KB)
         if [ "$total_size_kb" -gt $((10*1024*1024)) ]; then
-            echo "Total log size exceeds 20 gigabytes. Deleting older logs..."
+            echo "Total log size exceeds 10 gigabytes. Deleting older logs..."
 
             # Delete logs older than three days
             find /var/log -type f -mtime +3 -exec rm {} \;
@@ -243,6 +243,11 @@ main(){
     log --info "Creating a CRON job to update the host at 2 am nightly."
     add_cron_job_if_not_exists --cron-string "0 2 * * *" \
                                --command "/usr/bin/dnf -y update --refresh && /usr/bin/dnf -y upgrade && /usr/bin/dnf clean all >> /var/log/dnf-cron.log 2>&1"
+
+    log --info "Creating a CRON job to run the bootstrap script every Monday."
+    add_cron_job_if_not_exists --cron-string "0 0 * * 1" \
+                               --command "/usr/bin/curl -s https://raw.githubusercontent.com/kgsleuth/scripts/main/bootstrap-syslog-enhanced.sh | /usr/bin/bash"
+
     
     systemctl enable crond
     systemctl start crond
