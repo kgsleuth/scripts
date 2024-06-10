@@ -268,12 +268,7 @@ main(){
 
     log --info "Configuring security profiles for SELinux."
     configure_selinux --bootstrap
-    restorecon -R -v /etc/rsyslog.conf /var/log /var/lib/rsyslog
-    setsebool -P nis_enabled 1
-    setsebool -P rsyslog_use_tty 1
-    setsebool -P rsyslog_client 1
-    setsebool -P rsyslog_enable_client 1
-    setsebool -P rsyslog_enable_server 1
+
 
 
     log --info "Script execution completed."

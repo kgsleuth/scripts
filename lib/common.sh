@@ -692,11 +692,11 @@ configure_selinux() {
         log --info "Custom SELinux policy for $service has been created and applied."
     done
 
-    log --info "Setting SELinux back to enforcing mode."
-    setenforce 1
-
-    log --info "Setting SELinux to enforcing mode in the configuration file."
-    sed -E -i 's/SELINUX=(disabled|permissive)/SELINUX=enforcing/g' /etc/selinux/config
+#    log --info "Setting SELinux back to enforcing mode."
+#    setenforce 1
+#
+#    log --info "Setting SELinux to enforcing mode in the configuration file."
+#    sed -E -i 's/SELINUX=(disabled|permissive)/SELINUX=enforcing/g' /etc/selinux/config
 
 }
 
