@@ -79,38 +79,27 @@ LOGROTATE_CONF_PATH="$LOGROTATE_CONF_DIR/all_logs"
 LOGROTATE_CONF=$(cat <<'EOF'
 ## Log rotation configuration content
 
-# This logrotate configuration defines rotation settings for all logs on the
-# host. It rotates logs located in /var/log and its subdirectories, keeping
-# three rotated copies and rotating logs daily. If a log file exceeds 100
-# megabytes or the total log size surpasses 20 gigabytes, it triggers rotation.
-# Rotated logs are compressed, and compression is delayed until the next
-# rotation. The configuration handles missing and empty logs gracefully, sets
-# ownership and permissions for new log files, and runs postrotate scripts for
-# additional actions such as rotating syslog logs and deleting older logs if the
-# total size exceeds the limit or if logs are older than three days.
+# This logrotate configuration sets rotation settings for all logs on the host.
+# It rotates logs in /var/log and its subdirectories daily, keeping seven rotated
+# copies. Logs are compressed, and compression is delayed until the next rotation.
+# It handles missing and empty logs gracefully, sets ownership and permissions
+# for new log files, and includes a postrotate script to delete logs older than
+# seven days.
 
 # Rotate all logs in /var/log and its subdirectories
 /var/log/* /var/log/*/* {
-    rotate 3
     daily
-    size 100M
-    compress
-    delaycompress
+    rotate 7
     missingok
     notifempty
+    compress
+    delaycompress
+    dateext
     create 0640 root adm
     sharedscripts
     postrotate
-        # Calculate the total size of logs in kilobytes for comparison
-        total_size_kb=$(du -sk /var/log | cut -f1)
-
-        # Check if the total size exceeds 20 GB (20*1024*1024 KB)
-        if [ "$total_size_kb" -gt $((10*1024*1024)) ]; then
-            echo "Total log size exceeds 10 gigabytes. Deleting older logs..."
-
-            # Delete logs older than three days
-            find /var/log -type f -mtime +3 -exec rm {} \;
-        fi
+        # Ensure logs older than 7 days are deleted
+        find /var/log -type f -mtime +7 -exec rm {} \;
     endscript
 }
 EOF
@@ -279,6 +268,13 @@ main(){
 
     log --info "Configuring security profiles for SELinux."
     configure_selinux --bootstrap
+    restorecon -R -v /etc/rsyslog.conf /var/log /var/lib/rsyslog
+    setsebool -P nis_enabled 1
+    setsebool -P rsyslog_use_tty 1
+    setsebool -P rsyslog_client 1
+    setsebool -P rsyslog_enable_client 1
+    setsebool -P rsyslog_enable_server 1
+
 
     log --info "Script execution completed."
 }
