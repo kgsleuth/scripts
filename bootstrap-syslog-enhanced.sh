@@ -194,7 +194,8 @@ main(){
 
     log --info "Script execution started."
 
-    packages=( python3 policycoreutils-python-utils rsyslog rsyslog-gnutls )
+    packages=( python3 policycoreutils-python-utils rsyslog rsyslog-gnutls setroubleshoot)
+
 
     log --info "Updating the host and installing required packages"
     upm --update
@@ -215,6 +216,13 @@ main(){
     config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
     config_builder "$RSYSLOG_CONF_PATH"         "$RSYSLOG_CONF"     "Normal log reception"
     config_builder "$RSYSLOG_TLS_CONF_PATH"     "$RSYSLOG_TLS_CONF" "Secure log reception"
+
+    # Adjust the /etc/rsyslog.conf file to disable loading modules twice
+    sed -i 's/^\(module(load="imudp")\)/# \1/' /etc/rsyslog.conf
+    sed -i 's/^\(module(load="imtcp")\)/# \1/' /etc/rsyslog.conf
+    sed -i 's/^\(input(type="imudp" port="514")\)/# \1/' /etc/rsyslog.conf
+    sed -i 's/^\(input(type="imtcp" port="514")\)/# \1/' /etc/rsyslog.conf
+
 
     log --info "Enabling and starting firewall service"
     configure_firewall  --enable
@@ -254,6 +262,8 @@ main(){
 
     log --info "Cleaning up any existing logs, older than 3 days."
     find /var/log -type f -mtime +3 -exec rm -f {} \;
+
+
 
     # Adjust systemd-journald settings to optimize log storage
     sed -i 's/#SystemMaxUse=/SystemMaxUse=200M/' /etc/systemd/journald.conf
