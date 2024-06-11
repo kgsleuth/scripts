@@ -268,6 +268,11 @@ main(){
 
     log --info "Configuring security profiles for SELinux."
     configure_selinux --bootstrap
+    semanage port -a -t syslogd_port_t -p udp 514
+    semanage port -a -t syslogd_port_t -p tcp 514
+    semanage port -a -t syslogd_port_t -p tcp 6514
+    sudo restorecon -v /etc/rsyslog.conf
+
 
 
 
