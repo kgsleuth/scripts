@@ -270,11 +270,13 @@ main(){
     configure_selinux --bootstrap
     semanage port -a -t syslogd_port_t -p udp 514
     semanage port -a -t syslogd_port_t -p tcp 514
-    semanage port -a -t syslogd_port_t -p tcp 6514
+    semanage port -a -t syslog_tls_port_t -p tcp 6514
+
+    # Remove duplicate entries
+    semanage port -d -t syslogd_port_t -p udp 514
+    semanage port -d -t syslog_tls_port_t -p tcp 6514
+
     sudo restorecon -v /etc/rsyslog.conf
-
-
-
 
     log --info "Script execution completed."
 }
