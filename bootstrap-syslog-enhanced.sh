@@ -119,14 +119,14 @@ RSYSLOG_CONF=$(cat <<EOF
 # uses hostname/program. A unified ruleset processes all messages, streamlining
 # syslog handling, improving management, security, and log organization.
 
-## Load modules for UDP/TCP syslog. Ensures no duplicate module loading.
+### Load modules for UDP/TCP syslog. Ensures no duplicate module loading.
 module(load="imudp") # For UDP
 module(load="imtcp") # For TCP & TLS
-
-## Define UDP input on port 514 for syslog messages.
+#
+### Define UDP input on port 514 for syslog messages.
 input(type="imudp" port="514" address="0.0.0.0" ruleset="remoteLogs")
-
-# Define TCP input on port 514 for non-TLS syslog.
+#
+## Define TCP input on port 514 for non-TLS syslog.
 input(type="imtcp" port="514" address="0.0.0.0" ruleset="remoteLogs")
 
 
@@ -201,6 +201,14 @@ main(){
     [ ! -f "/.dockerenv" ] && log --info "Installing the Azure Monitor Agent" || log --info "Skipping AMA Install, in staging environment"
     [ ! -f "/.dockerenv" ] && install_ama_agent
 
+    log --info "Installing the Azure Monitor Agent"
+    if systemctl list-units --type=service | grep -q "azuremonitoragent.service"
+      then
+        log --info "Azure Monitor Agent is already installed"
+      else
+        install_ama_agent
+    fi
+
     log --info "Configure syslog services for log rotation and secure reception."
     config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
     config_builder "$RSYSLOG_CONF_PATH"         "$RSYSLOG_CONF"     "Normal log reception"
@@ -209,8 +217,8 @@ main(){
     # Adjust the /etc/rsyslog.conf file to disable loading modules twice
     sed -i 's/^\(module(load="imudp")\)/# \1/' /etc/rsyslog.conf
     sed -i 's/^\(module(load="imtcp")\)/# \1/' /etc/rsyslog.conf
-    sed -i 's/^\(input(type="imudp" port="514")\)/# \1/' /etc/rsyslog.conf
-    sed -i 's/^\(input(type="imtcp" port="514")\)/# \1/' /etc/rsyslog.conf
+    sed -i '/^input(type="imudp.*/s/.*/# &/' /etc/rsyslog.conf
+    sed -i '/^input(type="imtcp.*/s/.*/# &/' /etc/rsyslog.conf
 
 
     log --info "Enabling and starting firewall service"
@@ -229,6 +237,8 @@ main(){
     configure_firewall  --reload
 
     log --info "Restart necessary services to apply the new configurations."
+    systemctl daemon-reload
+    systemctl restart azuremonitoragent
     systemctl restart firewalld
     systemctl restart rsyslog
 
@@ -268,15 +278,6 @@ main(){
 
     log --info "Configuring security profiles for SELinux."
     configure_selinux --bootstrap
-    semanage port -a -t syslogd_port_t -p udp 514
-    semanage port -a -t syslogd_port_t -p tcp 514
-    semanage port -a -t syslog_tls_port_t -p tcp 6514
-
-    # Remove duplicate entries
-    semanage port -d -t syslogd_port_t -p udp 514
-    semanage port -d -t syslog_tls_port_t -p tcp 6514
-
-    sudo restorecon -v /etc/rsyslog.conf
 
     log --info "Script execution completed."
 }
