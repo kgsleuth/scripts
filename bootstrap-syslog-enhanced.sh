@@ -198,9 +198,6 @@ main(){
     log --info "Generating a self-signed certificate for TLS if none is provided, ensuring secure communication for syslog over TLS"
     generate_tls_certificates
 
-    [ ! -f "/.dockerenv" ] && log --info "Installing the Azure Monitor Agent" || log --info "Skipping AMA Install, in staging environment"
-    [ ! -f "/.dockerenv" ] && install_ama_agent
-
     log --info "Installing the Azure Monitor Agent"
     if systemctl list-units --type=service | grep -q "azuremonitoragent.service"
       then
@@ -251,11 +248,6 @@ main(){
     log --info "Creating a CRON job to update the host at 2 am nightly."
     add_cron_job_if_not_exists --cron-string "0 2 * * *" \
                                --command "/usr/bin/dnf -y update --refresh && /usr/bin/dnf -y upgrade && /usr/bin/dnf clean all >> /var/log/dnf-cron.log 2>&1"
-
-    log --info "Creating a CRON job to run the bootstrap script every Monday."
-    add_cron_job_if_not_exists --cron-string "0 0 * * 1" \
-                               --command "/usr/bin/curl -s https://raw.githubusercontent.com/kgsleuth/scripts/main/bootstrap-syslog-enhanced.sh | /usr/bin/bash"
-
     
     systemctl enable crond
     systemctl start crond
