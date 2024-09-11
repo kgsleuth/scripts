@@ -124,32 +124,16 @@ module(load="imudp") # For UDP
 module(load="imtcp") # For TCP & TLS
 #
 ### Define UDP input on port 514 for syslog messages.
-input(type="imudp" port="514" address="0.0.0.0" ruleset="remoteLogs")
-#
-## Define TCP input on port 514 for non-TLS syslog.
-input(type="imtcp" port="514" address="0.0.0.0" ruleset="remoteLogs")
+input(type="imudp" port="514" address="0.0.0.0")
 
+## Define TCP input on port 514 for non-TLS syslog.
+input(type="imtcp" port="514" address="0.0.0.0")
 
 # Define TCP input on port 6514 for TLS-encrypted syslog.
-input(type="imtcp" port="6514" address="0.0.0.0" ruleset="remoteLogs")
-
-
-# Template for dynamic log file naming based on hostname and program.
-template(name="RemoteLogFileName" type="string" 
-         string="/var/log/%HOSTNAME%/%PROGRAMNAME%.log")
-
-# Ruleset for processing all syslog messages.
-# Applies unified processing for both standard and encrypted logs.
-ruleset(name="remoteLogs") {
-    action(type="omfile" DynaFile="RemoteLogFileName")
-}
+input(type="imtcp" port="6514" address="0.0.0.0")
 
 # This configuration streamlines syslog processing, ensuring efficient
 # log management and facilitating secure, organized storage of log data.
-
-# # Set the logging level to "warning" to filter out lower severity messages
-# # such as informational and debug messages, leaving only warning and error messages.
-# $LogLevel warning
 
 EOF
 )
