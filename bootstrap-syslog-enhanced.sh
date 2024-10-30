@@ -73,37 +73,37 @@ CA_CERT="${CA_CERT:-/etc/ssl/certs/rsyslog-ca-cert.pem}"
 SERVER_CERT="${SERVER_CERT:-/etc/ssl/certs/rsyslog-server-cert.pem}"
 SERVER_KEY="${SERVER_KEY:-/etc/ssl/private/rsyslog-server-key.pem}"
 
-### Log rotation configuration content
-#LOGROTATE_CONF_DIR="/etc/logrotate.d"
-#LOGROTATE_CONF_PATH="$LOGROTATE_CONF_DIR/all_logs"
-#LOGROTATE_CONF=$(cat <<'EOF'
-### Log rotation configuration content
-#
-## This logrotate configuration sets rotation settings for all logs on the host.
-## It rotates logs in /var/log and its subdirectories daily, keeping seven rotated
-## copies. Logs are compressed, and compression is delayed until the next rotation.
-## It handles missing and empty logs gracefully, sets ownership and permissions
-## for new log files, and includes a postrotate script to delete logs older than
-## seven days.
-#
-## Rotate all logs in /var/log and its subdirectories
-#/var/log/* /var/log/*/* {
-#    daily
-#    rotate 7
-#    missingok
-#    notifempty
-#    compress
-#    delaycompress
-#    dateext
-#    create 0640 root adm
-#    sharedscripts
-#    postrotate
-#        # Ensure logs older than 7 days are deleted
-#        find /var/log -type f -mtime +7 -exec rm {} \;
-#    endscript
-#}
-#EOF
-#)
+## Log rotation configuration content
+LOGROTATE_CONF_DIR="/etc/logrotate.d"
+LOGROTATE_CONF_PATH="$LOGROTATE_CONF_DIR/all_logs"
+LOGROTATE_CONF=$(cat <<'EOF'
+## Log rotation configuration content
+
+# This logrotate configuration sets rotation settings for all logs on the host.
+# It rotates logs in /var/log and its subdirectories daily, keeping seven rotated
+# copies. Logs are compressed, and compression is delayed until the next rotation.
+# It handles missing and empty logs gracefully, sets ownership and permissions
+# for new log files, and includes a postrotate script to delete logs older than
+# seven days.
+
+# Rotate all logs in /var/log and its subdirectories
+/var/log/* /var/log/*/* {
+   daily
+   rotate 7
+   missingok
+   notifempty
+   compress
+   delaycompress
+   dateext
+   create 0640 root adm
+   sharedscripts
+   postrotate
+       # Ensure logs older than 7 days are deleted
+       find /var/log -type f -mtime +7 -exec rm {} \;
+   endscript
+}
+EOF
+)
 
 
 # Rsyslog configuration paths
@@ -191,7 +191,7 @@ main(){
     fi
 
     log --info "Configure syslog services for log rotation and secure reception."
-    # config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
+    config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
     config_builder "$RSYSLOG_CONF_PATH"         "$RSYSLOG_CONF"     "Normal log reception"
     config_builder "$RSYSLOG_TLS_CONF_PATH"     "$RSYSLOG_TLS_CONF" "Secure log reception"
 
