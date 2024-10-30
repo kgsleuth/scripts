@@ -87,7 +87,7 @@ LOGROTATE_CONF=$(cat <<'EOF'
 # seven days.
 
 # Rotate all logs in /var/log and its subdirectories
-/var/log/* /var/log/*/* {
+/var/log/* /var/log/*.log /var/log/*/* /var/log/*/*.log {
    daily
    rotate 7
    missingok
@@ -232,6 +232,11 @@ main(){
     log --info "Creating a CRON job to update the host at 2 am nightly."
     add_cron_job_if_not_exists --cron-string "0 2 * * *" \
                                --command "/usr/bin/dnf -y update --refresh && /usr/bin/dnf -y upgrade && /usr/bin/dnf clean all >> /var/log/dnf-cron.log 2>&1"
+
+
+    log --info "Creating a CRON job to restart the Azure Monitor agent on a reoccuring basis."
+    add_cron_job_if_not_exists --cron-string "*/15 * * * *" \
+                               --command "/bin/systemctl restart azuremonitoragent"
     
     systemctl enable crond
     systemctl start crond
