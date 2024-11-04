@@ -87,18 +87,19 @@ LOGROTATE_CONF=$(cat <<'EOF'
 # seven days.
 
 # Rotate individual log files in /var/log with specific paths
-/var/log/boot.log
-/var/log/messages
-/var/log/secure
-/var/log/cron
-/var/log/dnf.log
-/var/log/dnf.librepo.log
-/var/log/dnf.rpm.log
-/var/log/hawkey.log
-/var/log/uptrack.log
-/var/log/waagent.log {
+"/var/log/boot.log"
+"/var/log/messages"
+"/var/log/secure"
+"/var/log/cron"
+"/var/log/dnf.log"
+"/var/log/dnf.librepo.log"
+"/var/log/dnf.rpm.log"
+"/var/log/hawkey.log"
+"/var/log/uptrack.log"
+"/var/log/waagent.log" {
    hourly
-   rotate 168    # Equivalent to 7 days of hourly rotations
+   # Keeps 7 days of hourly logs
+   rotate 168
    missingok
    notifempty
    compress
@@ -107,11 +108,11 @@ LOGROTATE_CONF=$(cat <<'EOF'
    create 0640 root adm
    sharedscripts
    postrotate
-       # Ensure logs older than 7 days are deleted
+       # Clean up logs older than 7 days
        find /var/log -type f -mtime +7 -exec rm {} \;
-       # find /var/log -mindepth 1 -mtime +7 -exec rm -rf {} \;
    endscript
 }
+
 EOF
 )
 
