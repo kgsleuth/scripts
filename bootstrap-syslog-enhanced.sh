@@ -86,8 +86,17 @@ LOGROTATE_CONF=$(cat <<'EOF'
 # for new log files, and includes a postrotate script to delete logs older than
 # seven days.
 
-# Rotate all logs in /var/log and its subdirectories
-/var/log/* /var/log/*.log /var/log/*/* /var/log/*/*.log {
+# Rotate individual log files in /var/log with specific paths
+/var/log/boot.log
+/var/log/messages
+/var/log/secure
+/var/log/cron
+/var/log/dnf.log
+/var/log/dnf.librepo.log
+/var/log/dnf.rpm.log
+/var/log/hawkey.log
+/var/log/uptrack.log
+/var/log/waagent.log {
    hourly
    rotate 168    # Equivalent to 7 days of hourly rotations
    missingok
