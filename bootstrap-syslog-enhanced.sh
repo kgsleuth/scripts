@@ -99,8 +99,8 @@ LOGROTATE_CONF=$(cat <<'EOF'
    sharedscripts
    postrotate
        # Ensure logs older than 7 days are deleted
-       # find /var/log -type f -mtime +7 -exec rm {} \;
-       find /var/log -mindepth 1 -mtime +7 -exec rm -rf {} \;
+       find /var/log -type f -mtime +7 -exec rm {} \;
+       # find /var/log -mindepth 1 -mtime +7 -exec rm -rf {} \;
    endscript
 }
 EOF
