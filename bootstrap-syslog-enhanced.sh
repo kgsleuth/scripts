@@ -88,8 +88,8 @@ LOGROTATE_CONF=$(cat <<'EOF'
 
 # Rotate all logs in /var/log and its subdirectories
 /var/log/* /var/log/*.log /var/log/*/* /var/log/*/*.log {
-   daily
-   rotate 7
+   hourly
+   rotate 168    # Equivalent to 7 days of hourly rotations
    missingok
    notifempty
    compress
@@ -99,7 +99,8 @@ LOGROTATE_CONF=$(cat <<'EOF'
    sharedscripts
    postrotate
        # Ensure logs older than 7 days are deleted
-       find /var/log -type f -mtime +7 -exec rm {} \;
+       # find /var/log -type f -mtime +7 -exec rm {} \;
+       find /var/log -mindepth 1 -mtime +7 -exec rm -rf {} \;
    endscript
 }
 EOF
@@ -189,6 +190,10 @@ main(){
       else
         install_ama_agent
     fi
+
+    log --info "Backing up logrotate syslog settings."
+    grep -rl '/var/log/' /etc/logrotate.d/ | grep -vi 'all_logs' | grep -vi '.bak' | xargs -I {} mv {} {}.bak
+    
 
     log --info "Configure syslog services for log rotation and secure reception."
     config_builder "$LOGROTATE_CONF_PATH"       "$LOGROTATE_CONF"   "Custom logrotate"
