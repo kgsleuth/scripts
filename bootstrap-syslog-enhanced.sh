@@ -218,6 +218,7 @@ main(){
 
 
     log --info "Enabling and starting firewall service"
+    systemctl unmask firewalld
     configure_firewall  --enable
     configure_firewall  --start
 
