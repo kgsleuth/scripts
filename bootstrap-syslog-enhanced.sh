@@ -190,6 +190,9 @@ main(){
 
     setenforce 0
 
+    log --info "Unmasking the firewall service"
+    systemctl unmask firewalld
+
     log --info "Generating a self-signed certificate for TLS if none is provided, ensuring secure communication for syslog over TLS"
     generate_tls_certificates
 
@@ -218,7 +221,6 @@ main(){
 
 
     log --info "Enabling and starting firewall service"
-    systemctl unmask firewalld
     configure_firewall  --enable
     configure_firewall  --start
 
