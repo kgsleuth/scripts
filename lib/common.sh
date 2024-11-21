@@ -158,7 +158,7 @@ upm() {
                 $PKG_MANAGER update && $PKG_MANAGER upgrade -y
                 ;;
             dnf|microdnf|yum)
-                $PKG_MANAGER update -y
+                $PKG_MANAGER update -y  --exclude=WALinuxAgent
                 ;;
             *)
                 log --warn "Unsupported package manager for updating."
