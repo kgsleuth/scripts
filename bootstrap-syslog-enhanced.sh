@@ -108,8 +108,8 @@ LOGROTATE_CONF=$(cat <<'EOF'
    create 0640 root adm
    sharedscripts
    postrotate
-       # Clean up logs older than 7 days
-       find /var/log -type f -mtime +7 -exec rm {} \;
+       # Clean up logs older than 3 days
+       find /var/log -type f -mtime +3 -exec rm {} \;
    endscript
 }
 
@@ -244,7 +244,7 @@ main(){
 
     log --info "Creating a CRON job to delete logs older than 3 days."
     add_cron_job_if_not_exists --cron-string "0 */4 * * *" \
-                               --command "/usr/bin/find /var/log -type f -mtime +7 -exec rm -f {} \;"
+                               --command "/usr/bin/find /var/log -type f -mtime +3 -exec rm -f {} \;"
 
 
     log --info "Creating a CRON job to update the host at 2 am nightly."
