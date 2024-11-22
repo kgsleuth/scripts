@@ -232,6 +232,9 @@ main(){
     configure_firewall  --port 514  --protocol tcp
     configure_firewall  --port 6514 --protocol tcp
 
+    log --info "Configuring ama agent ports."
+    configure_firewall  --port 28330 --protocol tcp
+
     log --info "Loading new configurations"
     configure_firewall  --reload
 
