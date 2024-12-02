@@ -696,7 +696,8 @@ configure_selinux() {
 #    setenforce 1
 
     log --info "Setting SELinux to permissive mode in the configuration file."
-    sed -E -i 's/SELINUX=(disabled|enforcing)/SELINUX=permissive/g' /etc/selinux/config
+    #sed -E -i 's/SELINUX=(disabled|enforcing)/SELINUX=permissive/g' /etc/selinux/config    
+    sed -E -i 's/SELINUX=(permissive|enforcing)/SELINUX=disabled/g' /etc/selinux/config
 
 }
 
