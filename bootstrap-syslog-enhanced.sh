@@ -292,7 +292,7 @@ main(){
     log --info "Updating rsyslog configuration to standardize logging rules"
     sed -i '/^#\{0,\}[[:space:]]*RULES/q' /etc/rsyslog.conf
     sed -i '/^#\{0,\}[[:space:]]*RULES/ a \*.*;authpriv.none;cron.none;mail.none    /var/log/messages' /etc/rsyslog.conf
-
+    systemctl restart rsyslog
 
 
     # Restart systemd-journald to apply changes
