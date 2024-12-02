@@ -287,6 +287,13 @@ main(){
     sed -i 's/#SystemKeepFree=/SystemKeepFree=500M/' /etc/systemd/journald.conf
     sed -i 's/#SystemMaxFileSize=/SystemMaxFileSize=50M/' /etc/systemd/journald.conf
     sed -i 's/#SystemMaxFiles=/SystemMaxFiles=4/' /etc/systemd/journald.conf
+    
+    # Clean up the configuration file and standardize logging rules
+    log --info "Updating rsyslog configuration to standardize logging rules"
+    sed -i '/^#\{0,\}[[:space:]]*RULES/q' /etc/rsyslog.conf
+    sed -i '/^#\{0,\}[[:space:]]*RULES/ a \*.*;authpriv.none;cron.none;mail.none    /var/log/messages' /etc/rsyslog.conf
+
+
 
     # Restart systemd-journald to apply changes
     systemctl restart systemd-journald
