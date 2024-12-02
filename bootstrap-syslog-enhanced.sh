@@ -79,12 +79,9 @@ LOGROTATE_CONF_PATH="$LOGROTATE_CONF_DIR/all_logs"
 LOGROTATE_CONF=$(cat <<'EOF'
 ## Log rotation configuration content
 
-# This logrotate configuration sets rotation settings for all logs on the host.
-# It rotates logs in /var/log and its subdirectories daily, keeping seven rotated
-# copies. Logs are compressed, and compression is delayed until the next rotation.
-# It handles missing and empty logs gracefully, sets ownership and permissions
-# for new log files, and includes a postrotate script to delete logs older than
-# seven days.
+# This logrotate configuration sets rotation settings for selected logs in /var/log.
+# Logs will rotate hourly and be kept for 3 days (72 rotations), with compression and delayed compression.
+# Logs older than 3 days will be deleted via postrotate script.
 
 # Rotate individual log files in /var/log with specific paths
 "/var/log/boot.log"
@@ -97,20 +94,38 @@ LOGROTATE_CONF=$(cat <<'EOF'
 "/var/log/hawkey.log"
 "/var/log/uptrack.log"
 "/var/log/waagent.log" {
-   hourly
-   # Keeps 7 days of hourly logs
-   rotate 168
-   missingok
-   notifempty
-   compress
-   delaycompress
-   dateext
-   create 0640 root adm
-   sharedscripts
-   postrotate
-       # Clean up logs older than 3 days
-       find /var/log -type f -mtime +3 -exec rm {} \;
-   endscript
+
+    # Rotate logs every hour
+    hourly
+
+    # Keep 72 hourly logs (3 days of logs)
+    rotate 72
+
+    # Do not produce errors if the log file is missing
+    missingok
+
+    # Do not rotate empty log files
+    notifempty
+
+    # Compress old logs
+    compress
+
+    # Delay compression until the next rotation
+    delaycompress
+
+    # Append the date to rotated log files 
+    dateext
+
+    # Set ownership and permissions for new log files
+    create 0640 root adm
+
+    # Run postrotate script once for all files in this block
+    sharedscripts
+
+    # Cleanup logs older than 3 days (72 rotations)
+    postrotate
+        find /var/log -type f -mtime +3 -exec rm {} \;
+    endscript
 }
 
 EOF
