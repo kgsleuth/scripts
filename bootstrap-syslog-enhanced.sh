@@ -239,8 +239,8 @@ main(){
     configure_firewall  --enable
     configure_firewall  --start
 
-    log --info "Setting firewall to drop all inbound connections."
-    configure_firewall  --drop-all
+    # log --info "Setting firewall to drop all inbound connections."
+    # configure_firewall  --drop-all
 
     log --info "Configuring syslog reviecer ports."
     configure_firewall  --port 514  --protocol udp
